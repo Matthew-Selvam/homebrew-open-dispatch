@@ -1,10 +1,10 @@
 class OpenDispatch < Formula
   desc "One API to dispatch your content anywhere — self-hostable cross-poster"
   homepage "https://open-dispatch-landing.vercel.app"
-  url "https://github.com/Matthew-Selvam/Open-Dispatch/archive/refs/tags/v0.4.0.tar.gz"
-  sha256 "05de98a63f848dcad2116265d6075ea17ffd8f536909b11fd9dba3084138704b"
+  url "https://github.com/Matthew-Selvam/Open-Dispatch/archive/refs/tags/v0.4.1.tar.gz"
+  sha256 "22f9f91a81858fa9b51bf22d52d51bae08b6768bb56217fd9ef72281ff106284"
   license "MIT"
-  version "0.4.0"
+  version "0.4.1"
 
   head "https://github.com/Matthew-Selvam/Open-Dispatch.git", branch: "main"
 
@@ -12,16 +12,20 @@ class OpenDispatch < Formula
 
   # ── installation ─────────────────────────────────────────────────────────
   def install
-    python = Formula["python@3.12"].opt_bin/"python3"
+    # libexec/bin/python3 is the versioned shim; opt/bin only has python3.12
+    python = Formula["python@3.12"].opt_libexec/"bin/python3"
     venv   = libexec/"venv"
 
     # Create an isolated virtualenv so the system Python is untouched
     system python, "-m", "venv", venv
-    system "#{venv}/bin/pip", "install", "--upgrade", "--quiet", "pip", "wheel"
-    system "#{venv}/bin/pip", "install", "--quiet", "-r", "requirements.txt"
+    system "#{venv}/bin/pip", "install", "--upgrade", "--quiet", "--no-cache-dir", "pip", "wheel"
+    system "#{venv}/bin/pip", "install", "--quiet", "--no-cache-dir", "-r", "requirements.txt"
 
-    # Install the package itself (gives access to all modules by path)
+    # Install the package itself (gives access to all modules by path).
+    # Dir["*"] does not match dotfiles — .env.example must be installed
+    # explicitly or the caveats point at a file that does not exist.
     libexec.install Dir["*"]
+    libexec.install ".env.example"
 
     # Persist user data in the standard Homebrew var dir
     (var/"open-dispatch").mkpath
@@ -30,7 +34,7 @@ class OpenDispatch < Formula
     (bin/"dispatch").write <<~SHELL
       #!/bin/bash
       # open-dispatch CLI — installed by Homebrew
-      export OPEN_DISPATCH_DATA="#{var}/open-dispatch"
+      export OPEN_DISPATCH_DATA="${OPEN_DISPATCH_DATA:-#{var}/open-dispatch}"
       exec "#{libexec}/venv/bin/python" "#{libexec}/cli.py" "$@"
     SHELL
 
@@ -38,7 +42,7 @@ class OpenDispatch < Formula
     (bin/"open-dispatch").write <<~SHELL
       #!/bin/bash
       # open-dispatch server — installed by Homebrew
-      export OPEN_DISPATCH_DATA="#{var}/open-dispatch"
+      export OPEN_DISPATCH_DATA="${OPEN_DISPATCH_DATA:-#{var}/open-dispatch}"
       cd "#{libexec}"
 
       # Load .env from data dir if present
@@ -58,7 +62,7 @@ class OpenDispatch < Formula
     (bin/"open-dispatch-worker").write <<~SHELL
       #!/bin/bash
       # open-dispatch worker — installed by Homebrew
-      export OPEN_DISPATCH_DATA="#{var}/open-dispatch"
+      export OPEN_DISPATCH_DATA="${OPEN_DISPATCH_DATA:-#{var}/open-dispatch}"
       cd "#{libexec}"
 
       if [ -f "#{var}/open-dispatch/.env" ]; then
